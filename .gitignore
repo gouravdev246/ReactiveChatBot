@@ -1,0 +1,59 @@
+# -----------------------------------------------------------------------------
+# Dependencies & Package Managers
+# -----------------------------------------------------------------------------
+node_modules/
+jspm_packages/
+web_modules/
+.npm/
+vendor/
+
+# -----------------------------------------------------------------------------
+# Environment & Secrets (NEVER commit api keys, passwords, or tokens)
+# -----------------------------------------------------------------------------
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+*.pem
+
+# -----------------------------------------------------------------------------
+# Build Outputs & Compiled Code
+# -----------------------------------------------------------------------------
+dist/
+build/
+out/
+bin/
+obj/
+*.exe
+*.dll
+*.so
+*.class
+*.pyc
+
+# -----------------------------------------------------------------------------
+# Logs and Runtime Files
+# -----------------------------------------------------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.stylelintcache
+*.pid
+*.seed
+*.lock
+i
+
+# -----------------------------------------------------------------------------
+# IDEs and Text Editors
+# -----------------------------------------------------------------------------
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
