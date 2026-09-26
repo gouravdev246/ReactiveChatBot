@@ -1,4 +1,4 @@
-https://api.telegram.org/bot8753243925:AAFGmNppbXB1mmu1mUQZrCPRj-yE2gYPpuY/setWebhook?url=https://xxxx-xx-xx.ngrok-free.app/api/telegram/webhook
+
 
 
 ngrok http 5002 --url https://pogo-jockstrap-spongy.ngrok-free.dev
