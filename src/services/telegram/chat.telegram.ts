@@ -1,7 +1,11 @@
 import axios from "axios";
 import { type Request, type Response } from "express";
 import { directMessage } from "../ai/chat.sendmessage.ai.js";
-
+import { prisma } from "../../config/prisma.js";
+import { type User, type UserMemory } from "@prisma/client";
+import { type FavouriteThings } from "../../types/userType.js";
+import { chainWithHistory } from "../ai/chat.shorthistory.js";
+import { chatWithLongTermMemory } from "../ai/chat.longmemory.js";
 const getBotToken = () => process.env.BOT_FATHER_API || process.env.BOT_TOKEN;
 
 
@@ -10,14 +14,18 @@ export async function sendTelegramChatAction(chatId: number | string, action: st
     if (!token) return;
 
     try {
-        await axios.post(`https://api.telegram.org/bot${token}/sendChatAction`, {
+        const res = await axios.post(`https://api.telegram.org/bot${token}/sendChatAction`, {
             chat_id: chatId,
             action: action,
         });
+
+
     } catch (error: any) {
         console.error("Failed to send chat action:", error?.response?.data || error?.message);
     }
 }
+
+
 
 /**
  * Send a text message to a Telegram chat
@@ -28,10 +36,12 @@ export async function sendTelegramMessage(chatId: number | string, text: string)
         throw new Error("Telegram BOT token is not configured in .env");
     }
 
+    const messageText = typeof text === "string" ? text : (text ? JSON.stringify(text) : "Mujhe samajh nahi aaya, ek baar fir se bolenge?");
+
     const TELEGRAM_MAX_LENGTH = 4000;
-    if (text.length > TELEGRAM_MAX_LENGTH) {
-        for (let i = 0; i < text.length; i += TELEGRAM_MAX_LENGTH) {
-            const chunk = text.slice(i, i + TELEGRAM_MAX_LENGTH);
+    if (messageText.length > TELEGRAM_MAX_LENGTH) {
+        for (let i = 0; i < messageText.length; i += TELEGRAM_MAX_LENGTH) {
+            const chunk = messageText.slice(i, i + TELEGRAM_MAX_LENGTH);
             await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
                 chat_id: chatId,
                 text: chunk,
@@ -42,7 +52,7 @@ export async function sendTelegramMessage(chatId: number | string, text: string)
 
     return await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
         chat_id: chatId,
-        text: text,
+        text: messageText,
     });
 }
 
@@ -80,6 +90,7 @@ export async function getTelegramWebhookInfo() {
 export async function callTelegramWebHook(req: Request, res: Response) {
     try {
         const update = req.body;
+        console.log(update);
 
         // Verify if update contains a message
         const message = update?.message || update?.edited_message;
@@ -96,7 +107,7 @@ export async function callTelegramWebHook(req: Request, res: Response) {
         if (!incomingText) {
             await sendTelegramMessage(
                 chatId,
-                "Mujhe abhi sirf text messages samajh aate hain! Kuch likh kar bhejo 😊"
+                "Aray sirf text karoo , yeh sab abhi nehi dekh sakti 😓"
             );
             return res.status(200).json({ ok: true });
         }
@@ -108,14 +119,129 @@ export async function callTelegramWebHook(req: Request, res: Response) {
             return res.status(200).json({ ok: true });
         }
 
-        // Send 'typing...' action so user knows AI is preparing reply
-        sendTelegramChatAction(chatId, "typing").catch(() => {});
+        // Find or create user in DB first
+        let user = await prisma.user.findUnique({
+            where: { chat_id: String(chatId) }
+        });
 
-        // Get AI answer
-        const aiAnswer = await directMessage(incomingText, userName);
+        if (!user) {
+            user = await prisma.user.create({
+                data: {
+                    chat_id: String(chatId),
+                    name: userName,
+                    username: message.from?.username || null,
+                }
+            });
+        }
+
+        // Send 'typing...' action so user knows AI is preparing reply
+        sendTelegramChatAction(chatId, "typing").catch(() => { });
+
+        // Get AI answer with userId so user memory is retrieved
+        const config = { configurable: { sessionId: `${user.id}` } };
+        const aiAnswer = await chatWithLongTermMemory(user.id, incomingText, userName);
+
+        // const aiAnswer = await directMessage(incomingText, userName, user.id);
+
+        const rawContent = typeof aiAnswer.content === "string" ? aiAnswer.content : JSON.stringify(aiAnswer.content);
+
+        let parsedData: any = null;
+        try {
+            const cleanJson = rawContent.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
+            parsedData = JSON.parse(cleanJson);
+        } catch {
+            parsedData = { message: rawContent, memoryHints: [] };
+        }
+
+        const replyMessage = parsedData?.message || rawContent || "Mujhe samajh nahi aaya, ek baar fir se bolenge?";
 
         // Send answer back to user on Telegram
-        await sendTelegramMessage(chatId, aiAnswer);
+        await sendTelegramMessage(chatId, replyMessage);
+
+        // Extracting Data For UserMemory from AI-Response
+        const memoryHints = parsedData?.memoryHints || [];
+
+        const newFavourite: Record<string, any> = {};
+        const newStudies: Record<string, any> = {};
+        const newFriends: Record<string, any> = {};
+        const newDailyRoutine: Record<string, any> = {};
+        const newFacts: Record<string, any> = {};
+
+        for (const hint of memoryHints) {
+            const { category, key, value } = hint;
+            if (!key) continue;
+
+            switch (category) {
+                case "favourite":
+                    newFavourite[key] = value;
+                    break;
+                case "education":
+                case "studies":
+                    newStudies[key] = value;
+                    break;
+                case "friend":
+                case "friends":
+                    newFriends[key] = value;
+                    break;
+                case "routine":
+                case "dailyRoutine":
+                    newDailyRoutine[key] = value;
+                    break;
+                case "goal":
+                case "fact":
+                case "facts":
+                default:
+                    newFacts[key] = value;
+                    break;
+            }
+        }
+
+
+
+
+        // let userMemory = await prisma.userMemory.findUnique({
+        //     where: { userId: user.id }
+        // });
+
+        // if (!userMemory) {
+        //     userMemory = await prisma.userMemory.create({
+        //         data: {
+        //             userId: user.id,
+        //             userName: userName,
+        //             userAge: null,
+        //             currentMode: "FRIEND",
+        //             favourite: newFavourite,
+        //             studies: newStudies,
+        //             friends: newFriends,
+        //             dailyRoutine: newDailyRoutine,
+        //             facts: newFacts,
+        //         }
+        //     });
+        // } else {
+        //     // Merge new updates with existing JSON data
+        //     userMemory = await prisma.userMemory.update({
+        //         where: { userId: user.id },
+        //         data: {
+        //             favourite: { ...(userMemory.favourite as object || {}), ...newFavourite },
+        //             studies: { ...(userMemory.studies as object || {}), ...newStudies },
+        //             friends: { ...(userMemory.friends as object || {}), ...newFriends },
+        //             dailyRoutine: { ...(userMemory.dailyRoutine as object || {}), ...newDailyRoutine },
+        //             facts: { ...(userMemory.facts as object || {}), ...newFacts },
+        //         }
+        //     });
+        // }
+
+        // console.log("Favourite Hints :", newFavourite);
+        // console.log("Facts :", newFacts);
+        // console.log("studies", newStudies);
+        // console.log("friends", newFriends);
+        // console.log("Daily routine", newDailyRoutine);
+
+
+
+
+
+
 
         return res.status(200).json({ ok: true });
     } catch (error: any) {
@@ -124,3 +250,4 @@ export async function callTelegramWebHook(req: Request, res: Response) {
         return res.status(200).json({ ok: false, error: error?.message });
     }
 }
+

@@ -6,7 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum CompanionMode {
   FAMILY
   FRIEND
@@ -19,7 +18,8 @@ enum CompanionMode {
 
 model User {
   id        String      @id @default(uuid())
-  email     String      @unique
+  username  String?     @unique
+  chat_id   String?     @unique
   name      String?
   password  String?
   memory    UserMemory?
@@ -28,74 +28,22 @@ model User {
 }
 
 model UserMemory {
-  id                String             @id @default(uuid())
-  userId            String             @unique
-  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userName          String?
-  userAge           String?
-  currentMode       CompanionMode      @default(FRIEND)
-  favourite         FavouriteThing[]
-  studies           StudyInfo[]
-  friends           FriendInfo[]
-  dailyRoutine      DailyRoutine[]
-  facts             Fact[]
-  pastConversation  PastConversation[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id               String             @id @default(uuid())
+  userId           String             @unique
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName         String?
+  userAge          String?
+  currentMode      CompanionMode      @default(FRIEND)
+  favourite        Json?
+  studies          Json?
+  friends          Json?
+  dailyRoutine     Json?
+  facts            Json?
+  pastConversation PastConversation[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
-model FavouriteThing {
-  id           String     @id @default(uuid())
-  userMemoryId String
-  userMemory   UserMemory @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
-  category     String
-  values       String[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-}
-
-model StudyInfo {
-  id           String     @id @default(uuid())
-  userMemoryId String
-  userMemory   UserMemory @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
-  school       String[]
-  collage      String[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-}
-
-model FriendInfo {
-  id            String     @id @default(uuid())
-  userMemoryId  String
-  userMemory    UserMemory @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
-  name          String
-  relation      String
-  specialThings String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-}
-
-model DailyRoutine {
-  id           String     @id @default(uuid())
-  userMemoryId String
-  userMemory   UserMemory @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
-  workTime     String[]
-  sleepTime    String[]
-  classTime    String[]
-  weakupTime   String[]
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-}
-
-model Fact {
-  id           String     @id @default(uuid())
-  userMemoryId String
-  userMemory   UserMemory @relation(fields: [userMemoryId], references: [id], onDelete: Cascade)
-  key          String
-  value        String
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-}
 
 model PastConversation {
   id               String     @id @default(uuid())

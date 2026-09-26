@@ -24,6 +24,7 @@ router.all("/set-webhook", async (req: Request, res: Response) => {
         }
 
         const result = await setTelegramWebhook(webhookUrl);
+        console.log("result =" , result)
         return res.status(200).json({ success: true, data: result });
     } catch (error: any) {
         return res.status(500).json({

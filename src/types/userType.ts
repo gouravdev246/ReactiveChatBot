@@ -1,3 +1,13 @@
+
+
+export interface User{
+    id : string;
+    username : string ;
+    name : string;
+    password : string;
+    memory : UserMemory;
+}
+
 export interface UserMemory {
     userId: string;
     userName: string;
@@ -11,9 +21,10 @@ export interface UserMemory {
     current_mode : COMPANION ;
 
 }
-interface FavouriteThings {
+export interface FavouriteThings {
     category: string;
-    values: string[];
+    key : string ;
+    values: string;
 }
 
 interface StudyInfo {
