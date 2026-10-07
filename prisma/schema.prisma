@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum CompanionMode {
@@ -17,14 +18,17 @@ enum CompanionMode {
 }
 
 model User {
-  id        String      @id @default(uuid())
-  username  String?     @unique
-  chat_id   String?     @unique
-  name      String?
-  password  String?
-  memory    UserMemory?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id                String              @id @default(uuid())
+  username          String?             @unique
+  chat_id           String?             @unique
+  name              String?
+  password          String?
+  memory            UserMemory?
+  lastInteractionAt DateTime?
+  scheduledMessages ScheduledMessage[]
+  proactiveMessages ProactiveMessageLog[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 }
 
 model UserMemory {
@@ -44,7 +48,6 @@ model UserMemory {
   updatedAt        DateTime           @updatedAt
 }
 
-
 model PastConversation {
   id               String     @id @default(uuid())
   userMemoryId     String
@@ -54,4 +57,42 @@ model PastConversation {
   lastMessage      String
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+}
+
+enum ScheduledMessageStatus {
+  PENDING
+  PROCESSING
+  SENT
+  SKIPPED
+  FAILED
+}
+
+model ScheduledMessage {
+  id              String                 @id @default(uuid())
+  userId          String
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bullJobId       String?                @unique
+  scheduledAt     DateTime
+  lastUserMessage String
+  status          ScheduledMessageStatus @default(PENDING)
+  reason          String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([userId, status])
+  @@index([scheduledAt])
+}
+
+model ProactiveMessageLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageSent String
+  context     String?
+  aiDecision  Json?
+  sentAt      DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([sentAt])
 }

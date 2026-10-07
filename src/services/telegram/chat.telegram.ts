@@ -6,6 +6,7 @@ import { type User, type UserMemory } from "@prisma/client";
 import { type FavouriteThings } from "../../types/userType.js";
 import { chainWithHistory } from "../ai/chat.shorthistory.js";
 import { chatWithLongTermMemory } from "../ai/chat.longmemory.js";
+import { scheduleProactiveCheck } from "../scheduler/queue.js";
 const getBotToken = () => process.env.BOT_FATHER_API || process.env.BOT_TOKEN;
 
 
@@ -157,6 +158,11 @@ export async function callTelegramWebHook(req: Request, res: Response) {
 
         // Send answer back to user on Telegram
         await sendTelegramMessage(chatId, replyMessage);
+
+        // Schedule proactive follow-up check (fires after 90-120 min of inactivity)
+        scheduleProactiveCheck(user.id, String(chatId), userName, incomingText).catch((err) =>
+            console.error("[Scheduler] Background scheduling error:", err?.message)
+        );
 
         // Extracting Data For UserMemory from AI-Response
         const memoryHints = parsedData?.memoryHints || [];
