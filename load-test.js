@@ -10,15 +10,15 @@ export const options = {
       timeUnit: '1s',
 
       stages: [
-        { target: 20, duration: '10s' },
-        { target: 50, duration: '30s' },
-        { target: 100, duration: '30s' },
+        { target: 200, duration: '10s' },
         { target: 500, duration: '30s' },
-        { target: 100, duration: '30s' },
+        { target: 1000, duration: '30s' },
+        { target: 5000, duration: '30s' },
+        { target: 7000, duration: '30s' },
       ],
 
-      preAllocatedVUs: 10,
-      maxVUs: 100,
+      preAllocatedVUs: 200,
+      maxVUs: 2000,
     },
   },
 
@@ -29,7 +29,7 @@ export const options = {
 
 export default function () {
   const response = http.get(
-    'https://jade-sisters-towards-needle.trycloudflare.com/api/v1/chathistory'
+    'https://sukhdeopalace.com/about.html'
   );
 
   check(response, {

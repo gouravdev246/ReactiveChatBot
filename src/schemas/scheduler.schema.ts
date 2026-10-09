@@ -19,6 +19,7 @@ export const ScheduledJobPayloadSchema = z.object({
   lastUserMessage: z.string().min(1),
   lastInteractionAt: z.coerce.date(),
   scheduledMessageId: z.string().uuid(), // DB reference
+  isSimulation: z.boolean().optional().default(false),
 });
 
 export type ScheduledJobPayload = z.infer<typeof ScheduledJobPayloadSchema>;

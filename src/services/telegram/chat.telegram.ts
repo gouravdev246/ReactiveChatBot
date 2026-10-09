@@ -135,6 +135,20 @@ export async function callTelegramWebHook(req: Request, res: Response) {
             });
         }
 
+        // Handle /simulate or /testproactive command for testing proactive messaging
+        if (incomingText.trim().startsWith("/simulate") || incomingText.trim().startsWith("/testproactive")) {
+            const simulatedMsg = incomingText.replace(/^\/(simulate|testproactive)/i, "").trim() || "Main DBMS exam dene ja raha hoon!";
+            await sendTelegramMessage(
+                chatId,
+                `Testing proactive scheduler! ⏰ Maine note kiya: "${simulatedMsg}".\n10 seconds ke andar Umii ka proactive check fire hoga...`
+            );
+            await scheduleProactiveCheck(user.id, String(chatId), userName, simulatedMsg, {
+                delayMs: 10_000,
+                isSimulation: true,
+            });
+            return res.status(200).json({ ok: true, simulated: true });
+        }
+
         // Send 'typing...' action so user knows AI is preparing reply
         sendTelegramChatAction(chatId, "typing").catch(() => { });
 

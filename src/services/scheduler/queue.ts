@@ -38,26 +38,30 @@ export async function scheduleProactiveCheck(
   userId: string,
   chatId: string,
   userName: string,
-  lastUserMessage: string
-): Promise<void> {
+  lastUserMessage: string,
+  options?: { delayMs?: number; isSimulation?: boolean }
+): Promise<string | undefined> {
   try {
-    const jobId = `proactive_${userId}`;
-
     // Step 1: Remove any existing pending job for this user (debounce)
-    const existingJob = await proactiveQueue.getJob(jobId);
-    if (existingJob) {
-      const state = await existingJob.getState();
-      if (state === "delayed" || state === "waiting") {
+    const pendingMsg = await prisma.scheduledMessage.findFirst({
+      where: { userId, status: "PENDING" },
+    });
+
+    if (pendingMsg?.bullJobId) {
+      const existingJob = await proactiveQueue.getJob(pendingMsg.bullJobId);
+      if (existingJob) {
         await existingJob.remove();
-        console.log(`[Scheduler] 🔄 Removed old pending job for user ${userId}`);
+        console.log(`[Scheduler] 🔄 Removed old pending job (${pendingMsg.bullJobId})`);
       }
     }
 
-    // Also mark any existing PENDING scheduled messages as SKIPPED
+    // Also mark any existing PENDING scheduled messages as SKIPPED and release bullJobId
     await prisma.scheduledMessage.updateMany({
       where: { userId, status: "PENDING" },
-      data: { status: "SKIPPED", reason: "User sent a new message — rescheduled" },
+      data: { status: "SKIPPED", reason: "User sent a new message — rescheduled", bullJobId: null },
     });
+
+    const jobId = `proactive_${userId}_${Date.now()}`;
 
     // Step 2: Update user's lastInteractionAt
     await prisma.user.update({
@@ -65,8 +69,15 @@ export async function scheduleProactiveCheck(
       data: { lastInteractionAt: new Date() },
     });
 
-    // Step 3: Create new ScheduledMessage record in DB
-    const delayMs = getRandomDelayMs(90, 120); // 90-120 minutes
+    // Step 3: Compute delay (supports configurable short delays for testing/simulation)
+    const envDelay = process.env.PROACTIVE_SIMULATION_DELAY_MS
+      ? parseInt(process.env.PROACTIVE_SIMULATION_DELAY_MS, 10)
+      : undefined;
+
+    const delayMs = options?.delayMs ?? envDelay ?? getRandomDelayMs(90, 120);
+    const isSim =
+      options?.isSimulation ??
+      (delayMs < 60_000 || process.env.PROACTIVE_SIMULATION_MODE === "true");
     const scheduledAt = new Date(Date.now() + delayMs);
 
     const scheduledMsg = await prisma.scheduledMessage.create({
@@ -87,6 +98,7 @@ export async function scheduleProactiveCheck(
       lastUserMessage,
       lastInteractionAt: new Date(),
       scheduledMessageId: scheduledMsg.id,
+      isSimulation: isSim,
     });
 
     // Step 5: Enqueue the delayed job in BullMQ
@@ -95,12 +107,18 @@ export async function scheduleProactiveCheck(
       delay: delayMs,
     });
 
-    const delayMin = Math.round(delayMs / 60_000);
+    const delayFormatted =
+      delayMs >= 60_000
+        ? `~${Math.round(delayMs / 60_000)} minutes`
+        : `${Math.round(delayMs / 1000)} seconds (simulation)`;
     console.log(
-      `[Scheduler] ⏰ Scheduled proactive check for user ${userId} in ~${delayMin} minutes (jobId: ${jobId})`
+      `[Scheduler] ⏰ Scheduled proactive check for user ${userId} in ${delayFormatted} (jobId: ${jobId})`
     );
+
+    return jobId;
   } catch (error: any) {
     console.error("[Scheduler] ❌ Failed to schedule proactive check:", error?.message || error);
+    return undefined;
   }
 }
 

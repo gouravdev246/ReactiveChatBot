@@ -1,5 +1,5 @@
 import app from "./src/app.js";
-import { startProactiveWorker } from "./src/services/scheduler/worker.js";
+import { startProactiveWorker } from "./src/jobs/proactiveMessage.worker.js";
 
 const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
