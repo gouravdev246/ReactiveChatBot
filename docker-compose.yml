@@ -1,0 +1,15 @@
+services:
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reactive_chatbot
+    restart: unless-stopped
+    ports:
+      # Bind only to localhost so it is NOT directly exposed publicly, only via Nginx reverse proxy
+      - "127.0.0.1:5002:5002"
+    env_file:
+      - .env
+    environment:
+      - PORT=5002
+      - NODE_ENV=production
